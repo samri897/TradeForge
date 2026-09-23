@@ -1,8 +1,8 @@
 import React, { useCallback } from 'react';
 import { View, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChartToolbar } from '../components/chart/ChartToolbar';
-import { ChartCanvas } from '../components/chart/ChartCanvas';
+import { TradingViewToolbar } from '../components/chart/TradingViewToolbar';
+import { TradingViewChart } from '../components/chart/TradingViewChart';
 import { ScriptEditor } from '../components/editor/ScriptEditor';
 import { useMarketData } from '../hooks/useMarketData';
 import { useScriptStore } from '../store/scriptStore';
@@ -29,8 +29,8 @@ export function ChartScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor={colors.bg.primary} />
       <View style={styles.container}>
-        <ChartToolbar onOpenEditor={openEditor} onReload={() => void reload()} isMock={isMock} />
-        <ChartCanvas />
+        <TradingViewToolbar onOpenEditor={openEditor} onReload={() => void reload()} isMock={isMock} />
+        <TradingViewChart />
         <ScriptEditor visible={showEditor} onClose={closeEditor} />
       </View>
     </SafeAreaView>

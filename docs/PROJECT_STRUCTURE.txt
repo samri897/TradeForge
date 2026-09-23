@@ -1,0 +1,87 @@
+TradeForge/
+├── App.tsx                          # Bootstrap: hydrate scripts, start AlertService
+├── app.json                         # Expo app config (dark UI, notifications plugin)
+├── package.json                     # Expo 51 + RN 0.74 + Zustand + SVG + gestures
+├── tsconfig.json                    # Strict TS + path aliases (@/)
+├── babel.config.js
+├── jest.config.js
+├── .env.example                     # Twelve Data / Alpha Vantage keys
+├── .gitignore
+├── README.md
+│
+├── assets/                          # icon, splash, favicon placeholders
+│
+├── docs/
+│   ├── ARCHITECTURE.md              # System design, data flows, Flutter port map
+│   ├── SCRIPT_LANGUAGE.md           # Pine-like DSL reference
+│   └── PROJECT_STRUCTURE.txt        # This file
+│
+└── src/
+    ├── api/
+    │   └── twelveData.ts            # REST time_series + WS quote helpers
+    │
+    ├── types/
+    │   ├── market.ts                # Candle, SymbolId, Timeframe, Quote…
+    │   ├── script.ts                # PlotSeries, SavedScript, ScriptOutput…
+    │   ├── alerts.ts                # AlertRule, AlertEvent
+    │   └── index.ts
+    │
+    ├── constants/
+    │   ├── instruments.ts           # Forex majors + XAU/USD, TF map
+    │   └── scriptTemplates.ts       # SMA Cross, RSI, MACD, Blank
+    │
+    ├── theme/
+    │   ├── colors.ts                # TradingView-inspired dark palette
+    │   └── index.ts                 # spacing, radius, chart layout constants
+    │
+    ├── store/
+    │   ├── chartStore.ts            # symbol, candles, viewport, plots, gestures
+    │   └── scriptStore.ts           # draft buffer, saved scripts, run/save
+    │
+    ├── services/
+    │   ├── marketData/
+    │   │   ├── MarketDataService.ts # cache + REST + WS + mock fallback
+    │   │   ├── mockData.ts          # deterministic synthetic OHLC
+    │   │   └── index.ts
+    │   ├── scriptEngine/
+    │   │   ├── ScriptEngine.ts      # sandboxed new Function() interpreter
+    │   │   ├── builtins.ts          # sma, ema, rsi, crossover…
+    │   │   ├── index.ts
+    │   │   └── __tests__/           # 12 unit tests (all passing)
+    │   └── alerts/
+    │       ├── AlertService.ts      # poll + push + oncePerBar
+    │       └── index.ts
+    │
+    ├── hooks/
+    │   ├── useMarketData.ts         # binds service → store + auto-run script
+    │   └── useChartGestures.ts      # pan / pinch / crosshair
+    │
+    ├── utils/
+    │   └── format.ts                # price, time, pct formatters
+    │
+    ├── components/
+    │   ├── chart/
+    │   │   ├── ChartCanvas.tsx      # ★ main SVG chart surface
+    │   │   ├── ChartToolbar.tsx     # symbol / TF / price / actions
+    │   │   ├── CandleLayer.tsx
+    │   │   ├── PlotLayer.tsx
+    │   │   ├── VolumeLayer.tsx
+    │   │   ├── MarkerLayer.tsx
+    │   │   ├── CrosshairLayer.tsx
+    │   │   └── index.ts
+    │   ├── editor/
+    │   │   ├── ScriptEditor.tsx     # ★ mono editor modal
+    │   │   ├── ScriptEditorWeb.tsx  # optional CodeMirror WebView
+    │   │   └── index.ts
+    │   └── alerts/
+    │       ├── AlertList.tsx
+    │       └── index.ts
+    │
+    ├── screens/
+    │   ├── ChartScreen.tsx          # ★ primary workspace
+    │   ├── ScriptsScreen.tsx
+    │   ├── AlertsScreen.tsx
+    │   └── index.ts
+    │
+    └── navigation/
+        └── RootNavigator.tsx        # Bottom tabs: Chart | Scripts | Alerts

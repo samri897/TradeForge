@@ -1,76 +1,330 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="color-scheme" content="dark" />
-    <title>TradeForge · TradingView Chart</title>
-    <style>
-      html, body {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background: #131722;
-      }
-      .tradingview-widget-container {
-        width: 100%;
-        height: 100%;
-        background: #131722;
-      }
-      .tradingview-widget-container__widget {
-        width: 100%;
-        height: calc(100% - 20px);
-      }
-      .tradingview-widget-copyright {
-        height: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #868993;
-        font: 10px Arial, sans-serif;
-      }
-      .tradingview-widget-copyright a {
-        color: #8EA8FF;
-        text-decoration: none;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="tradingview-root" class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright">
-        <a href="https://www.tradingview.com/" target="_blank" rel="noopener nofollow">Chart data and tools by TradingView</a>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="color-scheme" content="dark" />
+  <title>TradeForge · Advanced Chart</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0e11;
+      --panel: #131722;
+      --panel-raised: #1e222d;
+      --border: #2a2e39;
+      --text: #d1d4dc;
+      --muted: #858995;
+      --blue: #2962ff;
+      --green: #089981;
+      --red: #f23645;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); }
+    button, select, input, textarea { font: inherit; }
+    button { color: inherit; }
+    #app { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; background: var(--bg); }
+
+    .topbar {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 9px 12px 8px;
+      background: #131722;
+      border-bottom: 1px solid var(--border);
+    }
+    .topline, .controls { display: flex; align-items: center; min-width: 0; gap: 10px; }
+    .topline { min-height: 28px; }
+    .brand { display: flex; align-items: center; min-width: 0; gap: 8px; }
+    .brand-mark {
+      width: 26px; height: 26px; display: grid; place-items: center; flex: 0 0 auto;
+      border-radius: 7px; background: linear-gradient(135deg, #2962ff, #6842ff); color: #fff;
+      font-size: 11px; font-weight: 900; letter-spacing: -0.5px;
+    }
+    .brand-name { color: #f0f1f4; font-size: 13px; font-weight: 800; letter-spacing: .7px; white-space: nowrap; }
+    .brand-subtitle { color: var(--muted); font-size: 10px; margin-left: 3px; }
+    .grow { flex: 1; }
+    .feed-badge, .sim-badge {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 7px; border: 1px solid var(--border);
+      border-radius: 999px; color: #a9adb7; font-size: 9px; font-weight: 800; letter-spacing: .45px; white-space: nowrap;
+    }
+    .feed-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 7px #2962ff70; }
+    .refresh-button, .secondary-button, .icon-button {
+      border: 1px solid var(--border); border-radius: 5px; background: var(--panel-raised); cursor: pointer;
+    }
+    .refresh-button { height: 28px; padding: 0 9px; font-size: 12px; }
+    .script-toggle { height: 28px; padding: 0 9px; border: 1px solid #3b4660; border-radius: 5px; background: #202a42; color: #c7d3ff; cursor: pointer; font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .script-toggle:hover { background: #293758; }
+    .refresh-button:hover, .secondary-button:hover, .icon-button:hover { border-color: #596274; }
+
+    .controls { flex-wrap: wrap; }
+    .asset-select-wrap { position: relative; flex: 0 0 auto; }
+    .asset-select {
+      min-width: 174px; max-width: 220px; height: 34px; padding: 0 30px 0 10px; appearance: none;
+      color: #f0f1f4; border: 1px solid #363b49; border-radius: 5px; background: #1e222d; outline: none; cursor: pointer;
+    }
+    .asset-select-wrap::after { content: "⌄"; position: absolute; top: 4px; right: 10px; color: #a7aab3; pointer-events: none; }
+    .timeframes { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+    .timeframes::-webkit-scrollbar { display: none; }
+    .tf-button {
+      flex: 0 0 auto; min-width: 41px; height: 30px; padding: 0 9px; border: 1px solid transparent;
+      border-radius: 4px; color: #a7aab3; background: transparent; cursor: pointer; font-size: 11px; font-weight: 700;
+    }
+    .tf-button:hover { background: #232834; color: #e5e7eb; }
+    .tf-button.active { border-color: #4d7cff; background: var(--blue); color: #fff; }
+
+    .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 350px; flex: 1 1 auto; min-height: 0; gap: 1px; background: var(--border); }
+    #app.script-closed .workspace { grid-template-columns: minmax(0, 1fr); }
+    #app.script-closed .script-panel { display: none; }
+    .chart-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); }
+    .chart-panel-head { display: flex; align-items: center; min-height: 29px; padding: 0 10px; gap: 8px; border-bottom: 1px solid #202431; color: var(--muted); font-size: 10px; }
+    .chart-symbol { color: #d1d4dc; font-size: 11px; font-weight: 800; }
+    .chart-interval { color: #a7aab3; }
+    .chart-hint { margin-left: auto; white-space: nowrap; }
+    .tradingview-widget-container { position: relative; flex: 1 1 auto; width: 100%; min-height: 0; background: var(--panel); overflow: hidden; }
+    .tradingview-widget-container__widget { width: 100%; height: calc(100% - 19px); }
+    .tradingview-widget-copyright {
+      height: 19px; display: flex; align-items: center; justify-content: center;
+      color: #747986; font: 9px Arial, sans-serif; background: var(--panel);
+    }
+    .tradingview-widget-copyright a { color: #8ea8ff; text-decoration: none; }
+
+    .script-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #11141b; }
+    .script-head { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 11px; border-bottom: 1px solid var(--border); background: #171b25; }
+    .script-title { color: #e3e5e9; font-size: 12px; font-weight: 800; }
+    .script-subtitle { color: var(--muted); font-size: 10px; }
+    .sim-badge { margin-left: auto; padding: 4px 6px; border-color: #5e4421; color: #ffca78; background: #261d12; font-size: 8px; }
+    .script-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; min-height: 0; flex: 1 1 auto; }
+    .field-label { display: flex; flex-direction: column; gap: 5px; color: #a7aab3; font-size: 10px; font-weight: 700; letter-spacing: .25px; }
+    .field-row { display: flex; gap: 6px; }
+    .field-input, .template-select {
+      width: 100%; height: 31px; padding: 0 8px; outline: none; border: 1px solid #323745; border-radius: 4px;
+      background: #1a1e28; color: #e3e5e9; font-size: 11px;
+    }
+    .field-input:focus, .template-select:focus, .code-input:focus { border-color: #476ee8; }
+    .editor-label { flex: 1 1 auto; min-height: 0; }
+    .editor-shell { display: flex; flex: 1 1 auto; min-height: 145px; border: 1px solid #323745; border-radius: 5px; overflow: hidden; background: #0d1016; }
+    .line-numbers {
+      flex: 0 0 34px; margin: 0; padding: 9px 6px 9px 0; overflow: hidden; text-align: right;
+      color: #596171; background: #11151d; border-right: 1px solid #242936; font: 11px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; user-select: none;
+    }
+    .code-input {
+      flex: 1 1 auto; width: 1px; height: 100%; min-height: 145px; padding: 9px; resize: none; outline: none;
+      border: 0; color: #d1d4dc; background: #0d1016; tab-size: 2; white-space: pre; overflow: auto;
+      font: 11px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .editor-note { color: #858995; font-size: 9px; line-height: 1.4; }
+    .compile-row { display: flex; align-items: center; gap: 7px; }
+    .compile-button {
+      flex: 1; height: 34px; border: 1px solid #4774ff; border-radius: 5px; background: #2962ff; color: #fff;
+      font-size: 11px; font-weight: 800; cursor: pointer;
+    }
+    .compile-button:hover { background: #3c70ff; }
+    .clear-button { height: 34px; padding: 0 9px; border: 1px solid #323745; border-radius: 5px; background: #1a1e28; color: #b1b5bf; font-size: 10px; cursor: pointer; }
+    .compile-status { min-height: 14px; color: #858995; font-size: 10px; }
+    .compile-status.good { color: #67d7b6; }
+    .compile-status.bad { color: #ff7b86; }
+    .alerts-area { flex: 0 0 40%; min-height: 125px; display: flex; flex-direction: column; border-top: 1px solid var(--border); background: #0d1016; }
+    .alerts-header { display: flex; align-items: center; gap: 7px; min-height: 33px; padding: 0 10px; color: #d1d4dc; font-size: 10px; font-weight: 800; }
+    .count-pill { min-width: 18px; padding: 2px 5px; border-radius: 999px; background: #252b39; color: #b9c3da; text-align: center; font-size: 9px; }
+    .alerts-state { margin-left: auto; color: #858995; font-size: 9px; font-weight: 600; }
+    .active-alerts { max-height: 76px; overflow: auto; padding: 0 8px 5px; }
+    .alert-row { display: flex; align-items: center; gap: 6px; min-height: 25px; padding: 3px 5px; border-bottom: 1px solid #1c2029; color: #aeb3be; font-size: 9px; }
+    .alert-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d1d4dc; }
+    .alert-row-meta { color: #858995; white-space: nowrap; }
+    .remove-alert { padding: 1px 4px; border: 0; background: transparent; color: #858995; cursor: pointer; }
+    .log-box { flex: 1 1 auto; min-height: 40px; overflow: auto; padding: 4px 9px 8px; font: 9px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .log-entry { color: #8e95a3; overflow-wrap: anywhere; }
+    .log-entry.trigger { color: #ffca78; }
+    .log-entry.success { color: #67d7b6; }
+    .log-entry.error { color: #ff7b86; }
+    .log-time { color: #586171; margin-right: 5px; }
+
+    @media (max-width: 760px) {
+      .topbar { gap: 7px; padding: 7px 8px; }
+      .topline { gap: 6px; }
+      .brand-subtitle { display: none; }
+      .feed-badge { font-size: 8px; padding: 4px 6px; }
+      .controls { gap: 6px; flex-wrap: nowrap; }
+      .asset-select { min-width: 143px; width: 143px; height: 32px; font-size: 11px; }
+      .timeframes { flex: 1 1 auto; }
+      .tf-button { min-width: 37px; padding: 0 7px; height: 29px; font-size: 10px; }
+      #app:not(.script-open) .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+      #app:not(.script-open) .script-panel { display: none; }
+      #app.script-open .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(185px, 40vh) minmax(260px, 1fr); }
+      #app.script-open .script-panel { display: flex; }
+      .chart-panel-head { min-height: 26px; }
+      .script-panel { border-top: 1px solid var(--border); }
+      .script-head { min-height: 35px; }
+      .script-form { padding: 7px 8px; gap: 6px; }
+      .editor-shell { min-height: 82px; }
+      .code-input { min-height: 82px; }
+      .alerts-area { flex-basis: 34%; min-height: 96px; }
+      .editor-note { font-size: 8px; }
+    }
+    @media (max-width: 370px) {
+      .brand-name { font-size: 11px; }
+      .feed-badge { letter-spacing: 0; }
+      .asset-select { min-width: 127px; width: 127px; }
+      .tf-button { min-width: 34px; padding: 0 6px; }
+      .refresh-button { padding: 0 7px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="script-open">
+    <header class="topbar">
+      <div class="topline">
+        <div class="brand">
+          <div class="brand-mark">TF</div>
+          <div><span class="brand-name">TRADEFORGE</span><span class="brand-subtitle"> · Advanced Chart</span></div>
+        </div>
+        <div class="grow"></div>
+        <div class="feed-badge" title="Market data is supplied by TradingView / OANDA">
+          <span class="feed-dot"></span><span>TRADINGVIEW DATA</span>
+        </div>
+        <button id="toggleScriptPanel" class="script-toggle" type="button" aria-expanded="true">Code &amp; Alerts</button>
+        <button id="refreshWidget" class="refresh-button" type="button" title="Reload chart">↻</button>
       </div>
-    </div>
+      <div class="controls">
+        <label class="asset-select-wrap" aria-label="Select market">
+          <select id="assetSelect" class="asset-select">
+            <option value="OANDA:XAUUSD">XAUUSD · Gold</option>
+            <option value="OANDA:EURUSD">EURUSD · Euro / U.S. Dollar</option>
+            <option value="OANDA:GBPUSD">GBPUSD · Pound / U.S. Dollar</option>
+            <option value="OANDA:USDJPY">USDJPY · U.S. Dollar / Yen</option>
+            <option value="OANDA:USDCHF">USDCHF · U.S. Dollar / Swiss Franc</option>
+            <option value="OANDA:AUDUSD">AUDUSD · Australian Dollar / U.S. Dollar</option>
+            <option value="OANDA:USDCAD">USDCAD · U.S. Dollar / Canadian Dollar</option>
+            <option value="OANDA:NZDUSD">NZDUSD · New Zealand Dollar / U.S. Dollar</option>
+            <option value="OANDA:EURGBP">EURGBP · Euro / Pound</option>
+            <option value="OANDA:EURJPY">EURJPY · Euro / Yen</option>
+            <option value="OANDA:GBPJPY">GBPJPY · Pound / Yen</option>
+          </select>
+        </label>
+        <div id="timeframes" class="timeframes" role="tablist" aria-label="Chart timeframe">
+          <button class="tf-button" data-interval="1" type="button">1m</button>
+          <button class="tf-button active" data-interval="5" type="button">5m</button>
+          <button class="tf-button" data-interval="15" type="button">15m</button>
+          <button class="tf-button" data-interval="60" type="button">1h</button>
+          <button class="tf-button" data-interval="240" type="button">4h</button>
+          <button class="tf-button" data-interval="D" type="button">1D</button>
+        </div>
+      </div>
+    </header>
 
-    <script>
-      (function () {
-        const allowedSymbols = new Set([
-          'OANDA:XAUUSD',
-          'OANDA:EURUSD',
-          'OANDA:GBPUSD',
-          'OANDA:USDJPY',
-          'OANDA:USDCHF',
-          'OANDA:AUDUSD',
-          'OANDA:USDCAD',
-          'OANDA:NZDUSD',
-          'OANDA:EURGBP',
-          'OANDA:EURJPY',
-          'OANDA:GBPJPY'
-        ]);
-        const allowedIntervals = new Set(['1', '5', '15', '30', '60', '240', 'D', 'W']);
-        const query = new URLSearchParams(window.location.search);
-        const requestedSymbol = query.get('symbol');
-        const requestedInterval = query.get('interval');
-        const symbol = allowedSymbols.has(requestedSymbol) ? requestedSymbol : 'OANDA:XAUUSD';
-        const interval = allowedIntervals.has(requestedInterval) ? requestedInterval : '5';
+    <main class="workspace">
+      <section class="chart-panel" aria-label="TradingView chart">
+        <div class="chart-panel-head">
+          <span id="chartSymbol" class="chart-symbol">OANDA:XAUUSD</span>
+          <span>·</span>
+          <span id="chartInterval" class="chart-interval">5m</span>
+          <span class="chart-hint">Drag to scroll · pinch / wheel to zoom · draw tools on left</span>
+        </div>
+        <div id="tradingview-root" class="tradingview-widget-container"></div>
+      </section>
 
+      <aside class="script-panel" aria-label="Custom script and alert simulator">
+        <div class="script-head">
+          <span class="script-title">Custom Script</span>
+          <span class="script-subtitle">indicator / alert rules</span>
+          <span class="sim-badge">SIMULATOR</span>
+        </div>
+        <div class="script-form">
+          <div class="field-row">
+            <label class="field-label" style="flex:1">
+              Alert Condition Name
+              <input id="alertName" class="field-input" type="text" maxlength="48" value="FVG / structure alert" placeholder="e.g. London liquidity sweep" />
+            </label>
+            <label class="field-label" style="flex:0 0 112px">
+              Example
+              <select id="templateSelect" class="template-select">
+                <option value="fvg">FVG</option>
+                <option value="liquidity">Liquidity</option>
+                <option value="ma">MA cross</option>
+                <option value="blank">Blank</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="field-label editor-label">
+            Rule code
+            <div class="editor-shell">
+              <pre id="lineNumbers" class="line-numbers" aria-hidden="true">1</pre>
+              <textarea id="scriptInput" class="code-input" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Write custom indicator or alert logic"></textarea>
+            </div>
+          </label>
+          <div class="editor-note">Pine-like examples are validated locally. Alert checks below are simulated and are not trade advice or live execution.</div>
+          <div class="compile-row">
+            <button id="compileRun" class="compile-button" type="button">▶ Compile &amp; Run Script</button>
+            <button id="stopSimulation" class="clear-button" type="button">Stop</button>
+          </div>
+          <div id="compileStatus" class="compile-status" role="status" aria-live="polite">Choose a template or enter an alert condition to begin.</div>
+        </div>
+
+        <section class="alerts-area" aria-label="Active simulated alerts and log">
+          <div class="alerts-header">
+            <span>ACTIVE ALERTS</span><span id="alertCount" class="count-pill">0</span>
+            <span id="simState" class="alerts-state">IDLE</span>
+          </div>
+          <div id="activeAlerts" class="active-alerts"><div class="alert-row"><span class="alert-row-meta">No active rules yet</span></div></div>
+          <div id="logBox" class="log-box" aria-live="polite">
+            <div class="log-entry"><span class="log-time">SYSTEM</span>Alert checks are simulated; the TradingView widget does not expose its data feed to this panel.</div>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const allowedSymbols = new Set([
+        'OANDA:XAUUSD', 'OANDA:EURUSD', 'OANDA:GBPUSD', 'OANDA:USDJPY', 'OANDA:USDCHF',
+        'OANDA:AUDUSD', 'OANDA:USDCAD', 'OANDA:NZDUSD', 'OANDA:EURGBP', 'OANDA:EURJPY', 'OANDA:GBPJPY'
+      ]);
+      const labels = { '1': '1m', '5': '5m', '15': '15m', '60': '1h', '240': '4h', 'D': '1D' };
+      const query = new URLSearchParams(window.location.search);
+      let selectedSymbol = allowedSymbols.has(query.get('symbol')) ? query.get('symbol') : 'OANDA:XAUUSD';
+      let selectedInterval = Object.prototype.hasOwnProperty.call(labels, query.get('interval')) ? query.get('interval') : '5';
+      let nextAlertId = 1;
+      let simulationTimer = null;
+      let rules = [];
+      let logEntries = [];
+
+      const symbolSelect = document.getElementById('assetSelect');
+      const timeframeButtons = Array.from(document.querySelectorAll('.tf-button'));
+      const editor = document.getElementById('scriptInput');
+      const nameInput = document.getElementById('alertName');
+      const lineNumbers = document.getElementById('lineNumbers');
+      const logBox = document.getElementById('logBox');
+      const activeAlertsBox = document.getElementById('activeAlerts');
+      const compileStatus = document.getElementById('compileStatus');
+      const appRoot = document.getElementById('app');
+      const scriptToggle = document.getElementById('toggleScriptPanel');
+
+      if (window.matchMedia && window.matchMedia('(max-width: 760px)').matches) {
+        appRoot.classList.remove('script-open');
+        appRoot.classList.add('script-closed');
+        scriptToggle.setAttribute('aria-expanded', 'false');
+      }
+
+      const templates = {
+        fvg: `// Fair Value Gap (FVG) example rule\n// A bullish gap forms when the current low is above the high two bars ago.\nbullishFVG = low > high[2]\nbearishFVG = high < low[2]\nalertcondition(bullishFVG or bearishFVG, "FVG formed", "New fair value gap")`,
+        liquidity: `// Liquidity sweep example rule\n// Sweep: price takes the previous swing and closes back inside.\nliquiditySweepHigh = high > highest(high[1], 5) and close < highest(high[1], 5)\nliquiditySweepLow = low < lowest(low[1], 5) and close > lowest(low[1], 5)\nalertcondition(liquiditySweepHigh or liquiditySweepLow, "Liquidity sweep", "Possible liquidity sweep")`,
+        ma: `// Moving average crossover example\nfastMA = sma(close, 9)\nslowMA = sma(close, 21)\nbullCross = crossover(fastMA, slowMA)\nbearCross = crossunder(fastMA, slowMA)\nalertcondition(bullCross or bearCross, "MA crossover", "Moving averages crossed")`,
+        blank: `// Write a Pine-like rule here.\n// Example: signal = crossover(sma(close, 9), sma(close, 21))\n// alertcondition(signal, "My alert", "Condition triggered")\n`
+      };
+
+      function renderWidget() {
+        const host = document.getElementById('tradingview-root');
+        host.innerHTML = '<div class="tradingview-widget-container__widget"></div><div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" target="_blank" rel="noopener nofollow">Chart data and tools by TradingView</a></div>';
         const config = {
           autosize: true,
-          symbol: symbol,
-          interval: interval,
+          symbol: selectedSymbol,
+          interval: selectedInterval,
           timezone: 'exchange',
           theme: 'dark',
           style: '1',
@@ -104,14 +358,214 @@
             'mainSeriesProperties.candleStyle.wickDownColor': '#F23645'
           }
         };
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.async = true;
+        script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+        script.innerHTML = JSON.stringify(config);
+        host.appendChild(script);
+        document.getElementById('chartSymbol').textContent = selectedSymbol;
+        document.getElementById('chartInterval').textContent = labels[selectedInterval] || selectedInterval;
+      }
 
-        const widgetScript = document.createElement('script');
-        widgetScript.type = 'text/javascript';
-        widgetScript.async = true;
-        widgetScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-        widgetScript.innerHTML = JSON.stringify(config);
-        document.getElementById('tradingview-root').appendChild(widgetScript);
-      })();
-    </script>
-  </body>
+      function setTimeframe(value) {
+        selectedInterval = value;
+        timeframeButtons.forEach((button) => {
+          const active = button.dataset.interval === value;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-selected', String(active));
+        });
+        renderWidget();
+      }
+
+      function timestamp() {
+        return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+
+      function addLog(message, kind) {
+        logEntries.unshift({ time: timestamp(), message: message, kind: kind || '' });
+        logEntries = logEntries.slice(0, 80);
+        logBox.innerHTML = logEntries.map((entry) =>
+          '<div class="log-entry ' + entry.kind + '"><span class="log-time">' + entry.time + '</span>' + escapeHtml(entry.message) + '</div>'
+        ).join('');
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+      }
+
+      function updateLineNumbers() {
+        const count = Math.max(1, editor.value.split('\n').length);
+        lineNumbers.textContent = Array.from({ length: count }, (_, index) => String(index + 1)).join('\n');
+        lineNumbers.scrollTop = editor.scrollTop;
+      }
+
+      function balancedDelimiters(code) {
+        const pairs = { ')': '(', ']': '[', '}': '{' };
+        const stack = [];
+        let quote = '';
+        let escaped = false;
+        let lineComment = false;
+        for (let i = 0; i < code.length; i += 1) {
+          const ch = code[i];
+          const next = code[i + 1];
+          if (lineComment) {
+            if (ch === '\n') lineComment = false;
+            continue;
+          }
+          if (quote) {
+            if (escaped) { escaped = false; continue; }
+            if (ch === '\\') { escaped = true; continue; }
+            if (ch === quote) quote = '';
+            continue;
+          }
+          if (ch === '/' && next === '/') { lineComment = true; i += 1; continue; }
+          if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+          if (ch === '(' || ch === '[' || ch === '{') stack.push(ch);
+          if (Object.prototype.hasOwnProperty.call(pairs, ch)) {
+            if (stack.pop() !== pairs[ch]) return 'Mismatched ' + ch + ' delimiter.';
+          }
+        }
+        if (quote) return 'Unclosed string literal.';
+        if (stack.length) return 'Unclosed ' + stack[stack.length - 1] + ' delimiter.';
+        return '';
+      }
+
+      function detectRuleType(code) {
+        if (/fvg|fair\s*value\s*gap/i.test(code)) return { label: 'FVG', chance: 0.10 };
+        if (/liquidity|sweep/i.test(code)) return { label: 'Liquidity sweep', chance: 0.08 };
+        if (/crossover|crossunder|sma\(|ema\(/i.test(code)) return { label: 'MA crossover', chance: 0.12 };
+        return { label: 'Custom condition', chance: 0.09 };
+      }
+
+      function renderRules() {
+        document.getElementById('alertCount').textContent = String(rules.length);
+        document.getElementById('simState').textContent = simulationTimer ? 'SIMULATING' : (rules.length ? 'PAUSED' : 'IDLE');
+        if (!rules.length) {
+          activeAlertsBox.innerHTML = '<div class="alert-row"><span class="alert-row-meta">No active rules yet</span></div>';
+          return;
+        }
+        activeAlertsBox.innerHTML = rules.map((rule) =>
+          '<div class="alert-row"><span class="feed-dot"></span><span class="alert-row-name">' + escapeHtml(rule.name) + '</span><span class="alert-row-meta">' + rule.triggers + ' fired</span><button class="remove-alert" type="button" data-remove="' + rule.id + '" aria-label="Remove alert">×</button></div>'
+        ).join('');
+        activeAlertsBox.querySelectorAll('[data-remove]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const id = Number(button.getAttribute('data-remove'));
+            rules = rules.filter((rule) => rule.id !== id);
+            addLog('Removed an alert rule.', '');
+            renderRules();
+            if (!rules.length) stopSimulation(false);
+          });
+        });
+      }
+
+      function simulateChecks() {
+        if (!rules.length) return;
+        rules.forEach((rule) => {
+          rule.checks += 1;
+          const fired = Math.random() < rule.chance;
+          if (fired) {
+            rule.triggers += 1;
+            addLog('SIMULATED TRIGGER · ' + rule.name + ' (' + rule.type + ')', 'trigger');
+          } else {
+            addLog('Check ' + rule.name + ' · no trigger (' + rule.type + ', simulated)', '');
+          }
+        });
+        renderRules();
+      }
+
+      function startSimulation() {
+        if (simulationTimer || !rules.length) return;
+        simulationTimer = window.setInterval(simulateChecks, 5000);
+        renderRules();
+        addLog('Started simulated checks every 5 seconds. This does not read TradingView candles.', 'success');
+      }
+
+      function stopSimulation(logStop) {
+        if (simulationTimer) window.clearInterval(simulationTimer);
+        simulationTimer = null;
+        renderRules();
+        if (logStop) addLog('Simulation paused.', '');
+      }
+
+      function compileAndRun() {
+        const source = editor.value.trim();
+        const name = nameInput.value.trim() || 'Custom alert';
+        if (!source) {
+          compileStatus.textContent = 'Enter a rule before compiling.';
+          compileStatus.className = 'compile-status bad';
+          addLog('Compile failed: editor is empty.', 'error');
+          return;
+        }
+        const error = balancedDelimiters(source);
+        if (error) {
+          compileStatus.textContent = 'Compile check failed: ' + error;
+          compileStatus.className = 'compile-status bad';
+          addLog('Compile check failed: ' + error, 'error');
+          return;
+        }
+        const type = detectRuleType(source);
+        const hasAlert = /alertcondition\s*\(|alert\s*\(|signal\s*=/i.test(source);
+        const rule = { id: nextAlertId++, name: name, type: type.label, chance: type.chance, checks: 0, triggers: 0, source: source };
+        rules.unshift(rule);
+        compileStatus.textContent = hasAlert
+          ? 'Rule validated and armed in simulation mode.'
+          : 'Syntax looks balanced; no alertcondition found, so a placeholder check will be simulated.';
+        compileStatus.className = 'compile-status good';
+        addLog('Validated "' + name + '" · ' + type.label + ' · SIMULATION ONLY', 'success');
+        renderRules();
+        startSimulation();
+      }
+
+      document.getElementById('timeframes').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-interval]');
+        if (button) setTimeframe(button.dataset.interval);
+      });
+      symbolSelect.addEventListener('change', () => {
+        selectedSymbol = allowedSymbols.has(symbolSelect.value) ? symbolSelect.value : 'OANDA:XAUUSD';
+        renderWidget();
+      });
+      document.getElementById('refreshWidget').addEventListener('click', renderWidget);
+      scriptToggle.addEventListener('click', () => {
+        const opening = !appRoot.classList.contains('script-open');
+        appRoot.classList.toggle('script-open', opening);
+        appRoot.classList.toggle('script-closed', !opening);
+        scriptToggle.setAttribute('aria-expanded', String(opening));
+        if (opening) scriptToggle.textContent = 'Hide panel';
+        else scriptToggle.innerHTML = 'Code &amp; Alerts';
+      });
+      document.getElementById('compileRun').addEventListener('click', compileAndRun);
+      document.getElementById('stopSimulation').addEventListener('click', () => stopSimulation(true));
+      document.getElementById('templateSelect').addEventListener('change', (event) => {
+        const key = event.target.value;
+        if (templates[key] !== undefined) {
+          editor.value = templates[key];
+          updateLineNumbers();
+          compileStatus.textContent = 'Template loaded. Review it, name the alert, then compile.';
+          compileStatus.className = 'compile-status';
+        }
+      });
+      editor.addEventListener('input', updateLineNumbers);
+      editor.addEventListener('scroll', () => { lineNumbers.scrollTop = editor.scrollTop; });
+
+      symbolSelect.value = selectedSymbol;
+      timeframeButtons.forEach((button) => {
+        const active = button.dataset.interval === selectedInterval;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+      });
+      try {
+        editor.value = localStorage.getItem('tradeforge-script-draft') || templates.fvg;
+        nameInput.value = localStorage.getItem('tradeforge-alert-name') || nameInput.value;
+        editor.addEventListener('input', () => localStorage.setItem('tradeforge-script-draft', editor.value));
+        nameInput.addEventListener('input', () => localStorage.setItem('tradeforge-alert-name', nameInput.value));
+      } catch (_) {
+        editor.value = templates.fvg;
+      }
+      updateLineNumbers();
+      renderWidget();
+      addLog('Advanced chart ready. Drawing controls are provided by TradingView; alert rules here are simulated.', 'success');
+    })();
+  </script>
+</body>
 </html>

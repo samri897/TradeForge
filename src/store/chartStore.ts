@@ -30,6 +30,8 @@ interface ChartState {
 
   /** Visible window (indices into candles) */
   viewport: ChartViewport;
+  /** If false, keep the user's manual price range during pan and live updates. */
+  priceScaleAuto: boolean;
 
   /** Crosshair */
   crosshairIndex: number | null;
@@ -104,6 +106,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   hlines: [],
   markers: [],
   viewport: defaultViewport(0),
+  priceScaleAuto: true,
   crosshairIndex: null,
 
   setSymbol: (symbol) => set({
@@ -115,6 +118,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
     markers: [],
     crosshairIndex: null,
     viewport: defaultViewport(0),
+    priceScaleAuto: true,
   }),
   setTimeframe: (timeframe) => set({
     timeframe,
@@ -124,12 +128,15 @@ export const useChartStore = create<ChartState>((set, get) => ({
     markers: [],
     crosshairIndex: null,
     viewport: defaultViewport(0),
+    priceScaleAuto: true,
   }),
   setChartType: (chartType) => set({ chartType }),
   setCandles: (candles) => {
-    const { plots } = get();
+    const { plots, viewport, priceScaleAuto } = get();
     const vp = defaultViewport(candles.length);
-    const range = recomputePriceRange(candles, vp.from, vp.to, plots);
+    const range = priceScaleAuto
+      ? recomputePriceRange(candles, vp.from, vp.to, plots)
+      : { priceMin: viewport.priceMin, priceMax: viewport.priceMax };
     set({ candles, viewport: { ...vp, ...range }, error: null });
   },
   setQuote: (quote) => set({ quote }),
@@ -137,12 +144,14 @@ export const useChartStore = create<ChartState>((set, get) => ({
   setError: (error) => set({ error }),
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
   setScriptOutput: (plots, hlines, markers) => {
-    const { candles, viewport } = get();
-    const range = recomputePriceRange(candles, viewport.from, viewport.to, plots);
+    const { candles, viewport, priceScaleAuto } = get();
+    const range = priceScaleAuto
+      ? recomputePriceRange(candles, viewport.from, viewport.to, plots)
+      : { priceMin: viewport.priceMin, priceMax: viewport.priceMax };
     set({ plots, hlines, markers, viewport: { ...viewport, ...range } });
   },
   setViewport: (v) => {
-    const { viewport, candles, plots } = get();
+    const { viewport, candles, plots, priceScaleAuto } = get();
     const next = { ...viewport, ...v };
     const hasExplicitPriceRange = v.priceMin !== undefined || v.priceMax !== undefined;
 
@@ -152,15 +161,19 @@ export const useChartStore = create<ChartState>((set, get) => ({
       const priceMin = next.priceMin;
       const priceMax = next.priceMax;
       if (Number.isFinite(priceMin) && Number.isFinite(priceMax) && priceMax > priceMin) {
-        set({ viewport: { ...next, priceMin, priceMax } });
+        set({ viewport: { ...next, priceMin, priceMax }, priceScaleAuto: false });
       }
       return;
     }
 
-    // Horizontal pan/zoom should continue to autoscale to the visible candles.
+    // Keep a user-adjusted price range while panning. In auto mode, fit the new window.
     if (v.from !== undefined || v.to !== undefined) {
-      const range = recomputePriceRange(candles, next.from, next.to, plots);
-      set({ viewport: { ...next, ...range } });
+      if (priceScaleAuto) {
+        const range = recomputePriceRange(candles, next.from, next.to, plots);
+        set({ viewport: { ...next, ...range } });
+      } else {
+        set({ viewport: next });
+      }
       return;
     }
 
@@ -169,7 +182,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   setCrosshairIndex: (crosshairIndex) => set({ crosshairIndex }),
 
   pan: (deltaBars) => {
-    const { viewport, candles, plots } = get();
+    const { viewport, candles, plots, priceScaleAuto } = get();
     const width = viewport.to - viewport.from;
     let from = viewport.from + deltaBars;
     let to = viewport.to + deltaBars;
@@ -181,12 +194,14 @@ export const useChartStore = create<ChartState>((set, get) => ({
       to = candles.length - 1;
       from = Math.max(0, to - width);
     }
-    const range = recomputePriceRange(candles, from, to, plots);
+    const range = priceScaleAuto
+      ? recomputePriceRange(candles, from, to, plots)
+      : { priceMin: viewport.priceMin, priceMax: viewport.priceMax };
     set({ viewport: { from, to, ...range } });
   },
 
   zoom: (factor, anchor = 0.5) => {
-    const { viewport, candles, plots } = get();
+    const { viewport, candles, plots, priceScaleAuto } = get();
     const width = viewport.to - viewport.from;
     const newWidth = Math.min(
       theme.chart.maxVisibleBars,
@@ -203,20 +218,22 @@ export const useChartStore = create<ChartState>((set, get) => ({
       to = candles.length - 1;
       from = Math.max(0, to - newWidth);
     }
-    const range = recomputePriceRange(candles, from, to, plots);
+    const range = priceScaleAuto
+      ? recomputePriceRange(candles, from, to, plots)
+      : { priceMin: viewport.priceMin, priceMax: viewport.priceMax };
     set({ viewport: { from, to, ...range } });
   },
 
   resetPriceScale: () => {
     const { candles, plots, viewport } = get();
     const range = recomputePriceRange(candles, viewport.from, viewport.to, plots);
-    set({ viewport: { ...viewport, ...range } });
+    set({ viewport: { ...viewport, ...range }, priceScaleAuto: true });
   },
 
   resetViewport: () => {
     const { candles, plots } = get();
     const vp = defaultViewport(candles.length);
     const range = recomputePriceRange(candles, vp.from, vp.to, plots);
-    set({ viewport: { ...vp, ...range } });
+    set({ viewport: { ...vp, ...range }, priceScaleAuto: true });
   },
 }));

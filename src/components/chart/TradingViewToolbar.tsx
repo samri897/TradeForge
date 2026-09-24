@@ -1,10 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Pressable } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChartStore } from '../../store/chartStore';
 import { INSTRUMENTS, TIMEFRAMES } from '../../constants/instruments';
-import { formatPrice, formatPct } from '../../utils/format';
-import type { SymbolId, Timeframe } from '../../types';
+import { formatPct, formatPrice } from '../../utils/format';
+import type { SymbolId } from '../../types';
 
 interface Props {
   onOpenEditor: () => void;
@@ -13,115 +24,248 @@ interface Props {
 }
 
 export function TradingViewToolbar({ onOpenEditor, onReload, isMock }: Props) {
-  const symbol = useChartStore((s) => s.symbol);
-  const timeframe = useChartStore((s) => s.timeframe);
-  const quote = useChartStore((s) => s.quote);
-  const candles = useChartStore((s) => s.candles);
-  const setSymbol = useChartStore((s) => s.setSymbol);
-  const setTimeframe = useChartStore((s) => s.setTimeframe);
-
+  const symbol = useChartStore((state) => state.symbol);
+  const timeframe = useChartStore((state) => state.timeframe);
+  const quote = useChartStore((state) => state.quote);
+  const candles = useChartStore((state) => state.candles);
+  const loading = useChartStore((state) => state.loading);
+  const setSymbol = useChartStore((state) => state.setSymbol);
+  const setTimeframe = useChartStore((state) => state.setTimeframe);
+  const { width } = useWindowDimensions();
+  const compact = width < 390;
   const [symbolOpen, setSymbolOpen] = useState(false);
 
   const last = candles[candles.length - 1];
-  const prev = candles[candles.length - 2];
+  const previous = candles[candles.length - 2];
   const price = quote?.price ?? last?.close ?? 0;
-  const changeFrom = prev?.close ?? last?.open ?? price;
-  const up = price >= changeFrom;
-  const pct = formatPct(changeFrom, price);
+  const changeFrom = previous?.close ?? last?.open ?? price;
+  const isUp = price >= changeFrom;
+  const priceColor = isUp ? '#089981' : '#F23645';
+  const changeText = price ? formatPct(changeFrom, price) : '—';
 
   return (
     <View style={styles.wrap}>
-      {/* Top row - TradingView style */}
+      {/* Row one: symbol, live quote and actions. Kept separate from timeframes to avoid clipping on phones. */}
       <View style={styles.topRow}>
-        {/* Symbol */}
-        <TouchableOpacity style={styles.symbolBtn} onPress={() => setSymbolOpen(true)}>
-          <Text style={styles.symbolText}>{symbol}</Text>
-          <Ionicons name="chevron-down" size={12} color="#868993" />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Choose symbol, currently ${symbol}`}
+          style={styles.symbolButton}
+          onPress={() => setSymbolOpen(true)}
+        >
+          <Text numberOfLines={1} style={styles.symbolText}>{symbol}</Text>
+          <Ionicons name="chevron-down" size={13} color="#A7AAB3" />
         </TouchableOpacity>
 
-        {/* Timeframes - TradingView style tabs */}
-        <View style={styles.tfRow}>
-          {TIMEFRAMES.slice(0, 7).map((t) => (
-            <TouchableOpacity
-              key={t.value}
-              onPress={() => setTimeframe(t.value)}
-              style={[styles.tfBtn, timeframe === t.value && styles.tfBtnActive]}
-            >
-              <Text style={[styles.tfBtnText, timeframe === t.value && styles.tfBtnTextActive]}>{t.label}</Text>
-            </TouchableOpacity>
-          ))}
+        {isMock && (
+          <View style={styles.demoBadge}>
+            <Text style={styles.demoText}>DEMO</Text>
+          </View>
+        )}
+
+        <View style={styles.quoteBlock}>
+          {loading && <ActivityIndicator size="small" color="#2962FF" style={styles.loader} />}
+          <View style={styles.quoteTextBlock}>
+            <Text numberOfLines={1} style={[styles.priceText, { color: priceColor }]}>
+              {price ? formatPrice(price, symbol) : '—'}
+            </Text>
+            <Text numberOfLines={1} style={[styles.changeText, { color: priceColor }]}>
+              {changeText}
+            </Text>
+          </View>
         </View>
 
-        {/* Right side - price */}
-        <View style={styles.rightRow}>
-          <Text style={[styles.priceText, { color: up ? '#089981' : '#F23645' }]}>{price ? formatPrice(price, symbol) : '—'}</Text>
-          <Text style={[styles.pctText, { color: up ? '#089981' : '#F23645' }]}>{pct}</Text>
-          {isMock && <View style={styles.demoBadge}><Text style={styles.demoText}>DEMO</Text></View>}
-          <TouchableOpacity onPress={onReload} style={styles.iconBtn}>
-            <Ionicons name="refresh" size={16} color="#868993" />
+        <View style={styles.actions}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Refresh chart data"
+            onPress={onReload}
+            style={styles.actionButton}
+          >
+            <Ionicons name="refresh" size={16} color="#C8CAD1" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onOpenEditor} style={[styles.iconBtn, styles.codeBtn]}>
-            <Ionicons name="code-slash" size={16} color="#2962FF" />
-            <Text style={styles.codeText}>Pine</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Open Pine script editor"
+            onPress={onOpenEditor}
+            style={[styles.pineButton, compact && styles.pineButtonCompact]}
+          >
+            <Ionicons name="code-slash" size={15} color="#8EA8FF" />
+            {!compact && <Text style={styles.pineText}>Pine</Text>}
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Symbol picker modal - TradingView style */}
-      <Modal visible={symbolOpen} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => setSymbolOpen(false)}>
+      {/* All eight timeframes are visible in a clean, swipeable tab strip. */}
+      <View style={styles.timeframeRow}>
+        <ScrollView
+          style={styles.timeframeScroll}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.timeframeContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {TIMEFRAMES.map((item) => {
+            const selected = timeframe === item.value;
+            return (
+              <TouchableOpacity
+                key={item.value}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${item.label} timeframe`}
+                onPress={() => setTimeframe(item.value)}
+                style={[styles.timeframeTab, selected && styles.timeframeTabSelected]}
+              >
+                <Text style={[styles.timeframeText, selected && styles.timeframeTextSelected]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        {loading && <ActivityIndicator size="small" color="#2962FF" style={styles.timeframeLoader} />}
+      </View>
+
+      <Modal
+        visible={symbolOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSymbolOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSymbolOpen(false)} />
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Symbol Search</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select market</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Close symbol search"
+                onPress={() => setSymbolOpen(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={20} color="#A7AAB3" />
+              </TouchableOpacity>
+            </View>
             <FlatList
               data={INSTRUMENTS}
               keyExtractor={(item) => item.symbol}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.listItem, item.symbol === symbol && styles.listItemActive]}
-                  onPress={() => { setSymbol(item.symbol as SymbolId); setSymbolOpen(false); }}
-                >
-                  <View style={styles.listLeft}>
-                    <Text style={styles.listSymbol}>{item.symbol}</Text>
-                    <Text style={styles.listName}>{item.name}</Text>
-                  </View>
-                  <Text style={styles.listCat}>{item.category}</Text>
-                </TouchableOpacity>
-              )}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => {
+                const selected = item.symbol === symbol;
+                return (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={[styles.marketItem, selected && styles.marketItemSelected]}
+                    onPress={() => {
+                      setSymbol(item.symbol as SymbolId);
+                      setSymbolOpen(false);
+                    }}
+                  >
+                    <View style={styles.marketItemInfo}>
+                      <Text style={styles.marketSymbol}>{item.symbol}</Text>
+                      <Text numberOfLines={1} style={styles.marketName}>{item.name}</Text>
+                    </View>
+                    <Text style={styles.marketCategory}>{item.category}</Text>
+                  </TouchableOpacity>
+                );
+              }}
             />
           </View>
-        </Pressable>
+        </View>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { backgroundColor: '#131722', borderBottomWidth: 1, borderBottomColor: '#2A2E39', paddingVertical: 6, paddingHorizontal: 12 },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  symbolBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#2A2E39', borderRadius: 4 },
-  symbolText: { color: '#D1D4DC', fontWeight: '700', fontSize: 14 },
-  tfRow: { flexDirection: 'row', gap: 2, flex: 1 },
-  tfBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
-  tfBtnActive: { backgroundColor: '#2962FF' },
-  tfBtnText: { color: '#868993', fontSize: 12, fontWeight: '600' },
-  tfBtnTextActive: { color: 'white' },
-  rightRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  priceText: { fontSize: 14, fontWeight: '700', fontFamily: 'monospace' },
-  pctText: { fontSize: 12, fontWeight: '600' },
-  demoBadge: { backgroundColor: 'rgba(255, 152, 0, 0.2)', borderWidth: 1, borderColor: '#FF9800', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  demoText: { color: '#FF9800', fontSize: 9, fontWeight: '700' },
-  iconBtn: { padding: 6, borderRadius: 4 },
-  codeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(41, 98, 255, 0.1)', paddingHorizontal: 8 },
-  codeText: { color: '#2962FF', fontSize: 11, fontWeight: '600' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: '#1E222D', borderRadius: 8, borderWidth: 1, borderColor: '#2A2E39', maxHeight: '70%', padding: 16 },
-  modalTitle: { color: '#D1D4DC', fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  listItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8, borderRadius: 4 },
-  listItemActive: { backgroundColor: '#2A2E39' },
-  listLeft: { flex: 1 },
-  listSymbol: { color: '#D1D4DC', fontWeight: '700', fontSize: 14 },
-  listName: { color: '#868993', fontSize: 11, marginTop: 2 },
-  listCat: { color: '#868993', fontSize: 10, textTransform: 'uppercase' },
+  wrap: {
+    backgroundColor: '#131722',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A2E39',
+    paddingTop: 7,
+    paddingBottom: 6,
+    paddingHorizontal: 10,
+  },
+  topRow: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  symbolButton: {
+    maxWidth: 112,
+    minHeight: 31,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#2A2E39',
+    borderRadius: 5,
+  },
+  symbolText: { color: '#F0F1F4', fontWeight: '700', fontSize: 13 },
+  demoBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(255, 152, 0, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 152, 0, 0.45)',
+    borderRadius: 4,
+  },
+  demoText: { color: '#FFB74D', fontSize: 8, fontWeight: '800', letterSpacing: 0.3 },
+  quoteBlock: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
+  loader: { marginRight: 1 },
+  quoteTextBlock: { minWidth: 0, alignItems: 'flex-end' },
+  priceText: { fontSize: 12, fontWeight: '700', fontFamily: 'monospace' },
+  changeText: { fontSize: 10, fontWeight: '600' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionButton: {
+    width: 31,
+    height: 31,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E222D',
+    borderRadius: 5,
+  },
+  pineButton: {
+    minWidth: 55,
+    height: 31,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(41, 98, 255, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(41, 98, 255, 0.28)',
+    borderRadius: 5,
+  },
+  pineButtonCompact: { minWidth: 34, width: 34, paddingHorizontal: 0 },
+  pineText: { color: '#A9BBFF', fontSize: 11, fontWeight: '700' },
+  timeframeRow: { height: 34, flexDirection: 'row', alignItems: 'center', marginTop: 5 },
+  timeframeScroll: { flex: 1, minWidth: 0 },
+  timeframeContent: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 6 },
+  timeframeTab: {
+    minWidth: 40,
+    height: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 9,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  timeframeTabSelected: { backgroundColor: '#2962FF', borderColor: '#4D7CFF' },
+  timeframeText: { color: '#A7AAB3', fontSize: 12, fontWeight: '600' },
+  timeframeTextSelected: { color: '#FFFFFF', fontWeight: '700' },
+  timeframeLoader: { marginLeft: 4, marginRight: 2 },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.72)', padding: 18 },
+  modalCard: { width: '100%', maxWidth: 420, maxHeight: '72%', padding: 14, backgroundColor: '#1E222D', borderWidth: 1, borderColor: '#363B49', borderRadius: 9 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
+  modalTitle: { color: '#F0F1F4', fontSize: 16, fontWeight: '700' },
+  closeButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  marketItem: { minHeight: 53, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 9, borderRadius: 5 },
+  marketItemSelected: { backgroundColor: '#2A2E39' },
+  marketItemInfo: { flex: 1, minWidth: 0, paddingRight: 12 },
+  marketSymbol: { color: '#F0F1F4', fontSize: 13, fontWeight: '700' },
+  marketName: { color: '#9A9DA7', fontSize: 11, marginTop: 2 },
+  marketCategory: { color: '#858995', fontSize: 10, textTransform: 'uppercase' },
 });
 
 export default TradingViewToolbar;

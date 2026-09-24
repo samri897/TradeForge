@@ -17,14 +17,14 @@ export const INSTRUMENTS: Instrument[] = [
 export const DEFAULT_SYMBOL: SymbolId = 'EUR/USD';
 
 export const TIMEFRAMES: { value: Timeframe; label: string }[] = [
-  { value: '1m', label: 'M1' },
-  { value: '5m', label: 'M5' },
-  { value: '15m', label: 'M15' },
-  { value: '30m', label: 'M30' },
-  { value: '1h', label: 'H1' },
-  { value: '4h', label: 'H4' },
-  { value: '1d', label: 'D1' },
-  { value: '1w', label: 'W1' },
+  { value: '1m', label: '1m' },
+  { value: '5m', label: '5m' },
+  { value: '15m', label: '15m' },
+  { value: '30m', label: '30m' },
+  { value: '1h', label: '1h' },
+  { value: '4h', label: '4h' },
+  { value: '1d', label: '1D' },
+  { value: '1w', label: '1W' },
 ];
 
 export const DEFAULT_TIMEFRAME: Timeframe = '1h';

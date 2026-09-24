@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { marketData } from '../services/marketData/MarketDataService';
 import { useChartStore } from '../store/chartStore';
 import { useScriptStore } from '../store/scriptStore';
@@ -28,13 +28,21 @@ export function useMarketData() {
 
   const runScript = useScriptStore((s) => s.runDraft);
   const draftSource = useScriptStore((s) => s.draftSource);
+  const requestIdRef = useRef(0);
 
   const reload = useCallback(
     async (sym: SymbolId = symbol, tf: Timeframe = timeframe) => {
+      const requestId = ++requestIdRef.current;
+      const isCurrentRequest = () => {
+        const active = useChartStore.getState();
+        return requestId === requestIdRef.current && active.symbol === sym && active.timeframe === tf;
+      };
+
       setLoading(true);
       setError(null);
       try {
         const candles = await marketData.getCandles(sym, tf, { force: true });
+        if (!isCurrentRequest()) return;
         setCandles(candles);
         // Auto-run current draft so overlays stay in sync
         if (draftSource.trim()) {
@@ -42,9 +50,11 @@ export function useMarketData() {
           setScriptOutput(out.plots, out.hlines, out.markers);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load market data');
+        if (isCurrentRequest()) {
+          setError(err instanceof Error ? err.message : 'Failed to load market data');
+        }
       } finally {
-        setLoading(false);
+        if (isCurrentRequest()) setLoading(false);
       }
     },
     [symbol, timeframe, setCandles, setLoading, setError, draftSource, runScript, setScriptOutput],

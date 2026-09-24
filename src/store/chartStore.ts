@@ -50,6 +50,8 @@ interface ChartState {
   pan: (deltaBars: number) => void;
   /** Zoom around anchor (0..1 within viewport) */
   zoom: (factor: number, anchor?: number) => void;
+  /** Fit the vertical price scale to visible candles and overlays */
+  resetPriceScale: () => void;
   resetViewport: () => void;
 }
 
@@ -104,8 +106,25 @@ export const useChartStore = create<ChartState>((set, get) => ({
   viewport: defaultViewport(0),
   crosshairIndex: null,
 
-  setSymbol: (symbol) => set({ symbol, candles: [], plots: [], hlines: [], markers: [] }),
-  setTimeframe: (timeframe) => set({ timeframe, candles: [], plots: [], hlines: [], markers: [] }),
+  setSymbol: (symbol) => set({
+    symbol,
+    candles: [],
+    quote: null,
+    plots: [],
+    hlines: [],
+    markers: [],
+    crosshairIndex: null,
+    viewport: defaultViewport(0),
+  }),
+  setTimeframe: (timeframe) => set({
+    timeframe,
+    candles: [],
+    plots: [],
+    hlines: [],
+    markers: [],
+    crosshairIndex: null,
+    viewport: defaultViewport(0),
+  }),
   setChartType: (chartType) => set({ chartType }),
   setCandles: (candles) => {
     const { plots } = get();
@@ -125,8 +144,27 @@ export const useChartStore = create<ChartState>((set, get) => ({
   setViewport: (v) => {
     const { viewport, candles, plots } = get();
     const next = { ...viewport, ...v };
-    const range = recomputePriceRange(candles, next.from, next.to, plots);
-    set({ viewport: { ...next, ...range } });
+    const hasExplicitPriceRange = v.priceMin !== undefined || v.priceMax !== undefined;
+
+    // Keep manual vertical zoom when only the price range changes. Previously the
+    // automatic candle range overwrote every price-scale drag/zoom immediately.
+    if (hasExplicitPriceRange) {
+      const priceMin = next.priceMin;
+      const priceMax = next.priceMax;
+      if (Number.isFinite(priceMin) && Number.isFinite(priceMax) && priceMax > priceMin) {
+        set({ viewport: { ...next, priceMin, priceMax } });
+      }
+      return;
+    }
+
+    // Horizontal pan/zoom should continue to autoscale to the visible candles.
+    if (v.from !== undefined || v.to !== undefined) {
+      const range = recomputePriceRange(candles, next.from, next.to, plots);
+      set({ viewport: { ...next, ...range } });
+      return;
+    }
+
+    set({ viewport: next });
   },
   setCrosshairIndex: (crosshairIndex) => set({ crosshairIndex }),
 
@@ -167,6 +205,12 @@ export const useChartStore = create<ChartState>((set, get) => ({
     }
     const range = recomputePriceRange(candles, from, to, plots);
     set({ viewport: { from, to, ...range } });
+  },
+
+  resetPriceScale: () => {
+    const { candles, plots, viewport } = get();
+    const range = recomputePriceRange(candles, viewport.from, viewport.to, plots);
+    set({ viewport: { ...viewport, ...range } });
   },
 
   resetViewport: () => {

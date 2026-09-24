@@ -14,7 +14,18 @@ import { formatCandleTime, formatPrice } from '../../utils/format';
 
 const PRICE_SCALE_WIDTH = 72;
 const TIME_SCALE_HEIGHT = 24;
-const MIN_PRICE_PANE_HEIGHT = 60;
+const RIGHT_OFFSET_MIN_BARS = 6;
+const RIGHT_OFFSET_RATIO = 0.18;
+const TIMEFRAME_MS: Record<string, number> = {
+  '1m': 60_000,
+  '5m': 300_000,
+  '15m': 900_000,
+  '30m': 1_800_000,
+  '1h': 3_600_000,
+  '4h': 14_400_000,
+  '1d': 86_400_000,
+  '1w': 604_800_000,
+};
 
 type Point = { x: number; y: number };
 type Interaction =
@@ -58,9 +69,12 @@ export function TradingViewChart() {
 
   const chartWidth = Math.max(1, size.width - PRICE_SCALE_WIDTH);
   const timePaneY = Math.max(0, size.height - TIME_SCALE_HEIGHT);
-  const volumeHeight = Math.max(0, Math.min(size.height * 0.16, timePaneY - MIN_PRICE_PANE_HEIGHT));
-  const pricePaneHeight = Math.max(1, timePaneY - volumeHeight);
+  const pricePaneHeight = Math.max(1, timePaneY);
   const visibleBars = Math.max(1, viewport.to - viewport.from + 1);
+  const rightOffsetBars = Math.max(RIGHT_OFFSET_MIN_BARS, Math.ceil(visibleBars * RIGHT_OFFSET_RATIO));
+  const totalSlots = visibleBars + rightOffsetBars;
+  const slot = chartWidth / totalSlots;
+  const dataWidth = slot * visibleBars;
 
   const pointFromEvent = useCallback((event: any, touch?: any): Point => {
     const native = event?.nativeEvent ?? event ?? {};
@@ -95,9 +109,11 @@ export function TradingViewChart() {
   }, [setViewport]);
 
   const indexAtX = useCallback((x: number) => {
-    const index = Math.round(viewport.from + clamp(x / chartWidth, 0, 1) * visibleBars - 0.5);
+    // Keep the future/right margin genuinely empty instead of snapping to the last candle.
+    if (x < 0 || x >= dataWidth) return null;
+    const index = Math.round(viewport.from + (x / dataWidth) * visibleBars - 0.5);
     return clamp(index, 0, Math.max(0, candles.length - 1));
-  }, [chartWidth, viewport.from, visibleBars, candles.length]);
+  }, [dataWidth, viewport.from, visibleBars, candles.length]);
 
   const beginInteraction = useCallback((event: any) => {
     const touches = getTouches(event);
@@ -108,7 +124,7 @@ export function TradingViewChart() {
       const b = pointFromEvent(event, touches[1]);
       const centerX = (a.x + b.x) / 2;
       const distance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
-      interactionRef.current = { kind: 'pinch', distance, anchor: clamp(centerX / chartWidth, 0, 1) };
+      interactionRef.current = { kind: 'pinch', distance, anchor: clamp(centerX / dataWidth, 0, 1) };
       return;
     }
 
@@ -131,7 +147,7 @@ export function TradingViewChart() {
       interactionRef.current = { kind: 'pan', x: point.x, from: viewport.from, to: viewport.to };
       setCrosshairIndex(indexAtX(point.x));
     }
-  }, [chartWidth, pricePaneHeight, timePaneY, viewport.priceMin, viewport.priceMax, viewport.from, viewport.to, pointFromEvent, indexAtX, setCrosshairIndex]);
+  }, [chartWidth, dataWidth, pricePaneHeight, timePaneY, viewport.priceMin, viewport.priceMax, viewport.from, viewport.to, pointFromEvent, indexAtX, setCrosshairIndex]);
 
   const moveInteraction = useCallback((event: any) => {
     const touches = getTouches(event);
@@ -144,7 +160,7 @@ export function TradingViewChart() {
       const distance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
       const previous = interactionRef.current;
       if (previous?.kind !== 'pinch') {
-        interactionRef.current = { kind: 'pinch', distance, anchor: clamp(centerX / chartWidth, 0, 1) };
+        interactionRef.current = { kind: 'pinch', distance, anchor: clamp(centerX / dataWidth, 0, 1) };
       } else {
         const factor = clamp(previous.distance / distance, 0.75, 1.35);
         if (Math.abs(factor - 1) > 0.005) zoom(factor, previous.anchor);
@@ -182,7 +198,7 @@ export function TradingViewChart() {
     }
 
     if (current.kind === 'pan') {
-      const deltaBars = ((current.x - point.x) / chartWidth) * visibleBars;
+      const deltaBars = ((current.x - point.x) / dataWidth) * visibleBars;
       const width = current.to - current.from;
       let from = current.from + deltaBars;
       let to = current.to + deltaBars;
@@ -199,7 +215,7 @@ export function TradingViewChart() {
         setCrosshairIndex(indexAtX(point.x));
       }
     }
-  }, [chartWidth, visibleBars, candles.length, pricePaneHeight, pointFromEvent, setCrosshairIndex, indexAtX, setViewport, zoom]);
+  }, [chartWidth, dataWidth, visibleBars, candles.length, pricePaneHeight, pointFromEvent, setCrosshairIndex, indexAtX, setViewport, zoom]);
 
   const endInteraction = useCallback(() => {
     interactionRef.current = null;
@@ -216,10 +232,10 @@ export function TradingViewChart() {
       const ratio = clamp(point.y / pricePaneHeight, 0, 1);
       zoomPrice(deltaY > 0 ? 1.12 : 0.89, ratio);
     } else {
-      const anchor = clamp(point.x / chartWidth, 0, 1);
+      const anchor = clamp(point.x / dataWidth, 0, 1);
       zoom(deltaY > 0 ? 1.15 : 0.87, anchor);
     }
-  }, [chartWidth, pricePaneHeight, pointFromEvent, zoomPrice, zoom]);
+  }, [chartWidth, dataWidth, pricePaneHeight, pointFromEvent, zoomPrice, zoom]);
 
   const onMouseDown = useCallback((event: any) => {
     if (Date.now() < suppressMouseUntilRef.current) return;
@@ -296,12 +312,21 @@ export function TradingViewChart() {
   for (let i = Math.max(0, Math.floor(viewport.from)); i <= Math.min(candles.length - 1, Math.ceil(viewport.to)); i += step) {
     const candle = candles[i];
     if (!candle) continue;
-    const x = ((i - viewport.from + 0.5) / visibleBars) * chartWidth;
+    const x = (i - viewport.from + 0.5) * slot;
     timeLabels.push({ time: candle.time, x, index: i });
   }
-
-  const visibleSlice = candles.slice(Math.max(0, Math.floor(viewport.from)), Math.min(candles.length, Math.ceil(viewport.to) + 1));
-  const maxVolume = Math.max(1, ...visibleSlice.map((candle) => candle.volume || 0));
+  const lastVisibleIndex = Math.min(candles.length - 1, Math.floor(viewport.to));
+  const lastVisibleCandle = candles[lastVisibleIndex];
+  const intervalMs = TIMEFRAME_MS[timeframe] ?? TIMEFRAME_MS['1m'];
+  if (lastVisibleCandle) {
+    for (let offset = step; offset <= rightOffsetBars; offset += step) {
+      timeLabels.push({
+        time: lastVisibleCandle.time + offset * intervalMs,
+        x: (visibleBars + offset - 0.5) * slot,
+        index: candles.length + offset,
+      });
+    }
+  }
 
   return (
     <View style={styles.container} onLayout={onLayout}>
@@ -322,7 +347,6 @@ export function TradingViewChart() {
 
           {/* Candlesticks */}
           {(() => {
-            const slot = chartWidth / visibleBars;
             const bodyWidth = Math.max(1, Math.min(12, slot * 0.68));
             const elements: React.ReactNode[] = [];
             for (let i = Math.max(0, Math.floor(viewport.from)); i <= Math.min(candles.length - 1, Math.ceil(viewport.to)); i++) {
@@ -341,23 +365,6 @@ export function TradingViewChart() {
               elements.push(<Rect key={`body-${i}`} x={x - bodyWidth / 2} y={bodyTop} width={bodyWidth} height={bodyHeight} fill={color} stroke={color} strokeWidth={0.5} />);
             }
             return elements;
-          })()}
-
-          {/* Volume bars */}
-          {(() => {
-            const slot = chartWidth / visibleBars;
-            const bodyWidth = Math.max(1, Math.min(12, slot * 0.68));
-            const elements: React.ReactNode[] = [];
-            for (let i = Math.max(0, Math.floor(viewport.from)); i <= Math.min(candles.length - 1, Math.ceil(viewport.to)); i++) {
-              const candle = candles[i];
-              if (!candle) continue;
-              const height = ((candle.volume || 0) / maxVolume) * Math.max(0, volumeHeight - 4);
-              const x = (i - viewport.from + 0.5) * slot;
-              const y = pricePaneHeight + volumeHeight - height;
-              const fill = candle.close >= candle.open ? 'rgba(8, 153, 129, 0.48)' : 'rgba(242, 54, 69, 0.48)';
-              elements.push(<Rect key={`volume-${i}`} x={x - bodyWidth / 2} y={y} width={bodyWidth} height={height} fill={fill} />);
-            }
-            return <G>{elements}</G>;
           })()}
 
           {/* Right-hand price scale */}
@@ -394,7 +401,6 @@ export function TradingViewChart() {
 
           {/* Crosshair with matching axis badges */}
           {crossCandle && crosshairIndex != null && (() => {
-            const slot = chartWidth / visibleBars;
             const x = (crosshairIndex - viewport.from + 0.5) * slot;
             const y = clamp(yOf(crossCandle.close), 12, Math.max(12, pricePaneHeight - 12));
             return (

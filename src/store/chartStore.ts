@@ -89,7 +89,8 @@ function recomputePriceRange(candles: Candle[], from: number, to: number, plots:
     min = min === Infinity ? 0 : min * 0.99;
     max = max === -Infinity ? 1 : max * 1.01;
   }
-  const pad = (max - min) * 0.05;
+  // Give price action generous vertical breathing room, like a TradingView chart.
+  const pad = (max - min) * 0.65;
   return { priceMin: min - pad, priceMax: max + pad };
 }
 

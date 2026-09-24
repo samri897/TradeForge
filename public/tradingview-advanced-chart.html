@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="color-scheme" content="dark" />
+    <title>TradeForge · TradingView Chart</title>
+    <style>
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #131722;
+      }
+      .tradingview-widget-container {
+        width: 100%;
+        height: 100%;
+        background: #131722;
+      }
+      .tradingview-widget-container__widget {
+        width: 100%;
+        height: calc(100% - 20px);
+      }
+      .tradingview-widget-copyright {
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #868993;
+        font: 10px Arial, sans-serif;
+      }
+      .tradingview-widget-copyright a {
+        color: #8EA8FF;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="tradingview-root" class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright">
+        <a href="https://www.tradingview.com/" target="_blank" rel="noopener nofollow">Chart data and tools by TradingView</a>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const allowedSymbols = new Set([
+          'OANDA:XAUUSD',
+          'OANDA:EURUSD',
+          'OANDA:GBPUSD',
+          'OANDA:USDJPY',
+          'OANDA:USDCHF',
+          'OANDA:AUDUSD',
+          'OANDA:USDCAD',
+          'OANDA:NZDUSD',
+          'OANDA:EURGBP',
+          'OANDA:EURJPY',
+          'OANDA:GBPJPY'
+        ]);
+        const allowedIntervals = new Set(['1', '5', '15', '30', '60', '240', 'D', 'W']);
+        const query = new URLSearchParams(window.location.search);
+        const requestedSymbol = query.get('symbol');
+        const requestedInterval = query.get('interval');
+        const symbol = allowedSymbols.has(requestedSymbol) ? requestedSymbol : 'OANDA:XAUUSD';
+        const interval = allowedIntervals.has(requestedInterval) ? requestedInterval : '5';
+
+        const config = {
+          autosize: true,
+          symbol: symbol,
+          interval: interval,
+          timezone: 'exchange',
+          theme: 'dark',
+          style: '1',
+          locale: 'en',
+          backgroundColor: 'rgba(19, 23, 34, 1)',
+          gridColor: 'rgba(42, 46, 57, 0.55)',
+          hide_top_toolbar: true,
+          hide_side_toolbar: false,
+          allow_symbol_change: false,
+          hide_volume: true,
+          hide_legend: false,
+          studies: [],
+          withdateranges: false,
+          details: false,
+          hotlist: false,
+          calendar: false,
+          save_image: false,
+          show_popup_button: false,
+          support_host: 'https://www.tradingview.com',
+          overrides: {
+            'paneProperties.background': '#131722',
+            'paneProperties.backgroundType': 'solid',
+            'paneProperties.vertGridProperties.color': '#1E222D',
+            'paneProperties.horzGridProperties.color': '#1E222D',
+            'scalesProperties.textColor': '#D1D4DC',
+            'mainSeriesProperties.candleStyle.upColor': '#089981',
+            'mainSeriesProperties.candleStyle.downColor': '#F23645',
+            'mainSeriesProperties.candleStyle.borderUpColor': '#089981',
+            'mainSeriesProperties.candleStyle.borderDownColor': '#F23645',
+            'mainSeriesProperties.candleStyle.wickUpColor': '#089981',
+            'mainSeriesProperties.candleStyle.wickDownColor': '#F23645'
+          }
+        };
+
+        const widgetScript = document.createElement('script');
+        widgetScript.type = 'text/javascript';
+        widgetScript.async = true;
+        widgetScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+        widgetScript.innerHTML = JSON.stringify(config);
+        document.getElementById('tradingview-root').appendChild(widgetScript);
+      })();
+    </script>
+  </body>
+</html>

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
@@ -8,44 +7,28 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useChartStore } from '../../store/chartStore';
 import { INSTRUMENTS, TIMEFRAMES } from '../../constants/instruments';
-import { formatPct, formatPrice } from '../../utils/format';
 import type { SymbolId } from '../../types';
 
 interface Props {
   onOpenEditor: () => void;
   onReload: () => void;
-  isMock?: boolean;
 }
 
-export function TradingViewToolbar({ onOpenEditor, onReload, isMock }: Props) {
+/** Compact TradeForge controls; the embedded TradingView chart supplies the market feed and drawing toolbar. */
+export function TradingViewToolbar({ onOpenEditor, onReload }: Props) {
   const symbol = useChartStore((state) => state.symbol);
   const timeframe = useChartStore((state) => state.timeframe);
-  const quote = useChartStore((state) => state.quote);
-  const candles = useChartStore((state) => state.candles);
-  const loading = useChartStore((state) => state.loading);
   const setSymbol = useChartStore((state) => state.setSymbol);
   const setTimeframe = useChartStore((state) => state.setTimeframe);
-  const { width } = useWindowDimensions();
-  const compact = width < 390;
   const [symbolOpen, setSymbolOpen] = useState(false);
-
-  const last = candles[candles.length - 1];
-  const previous = candles[candles.length - 2];
-  const price = quote?.price ?? last?.close ?? 0;
-  const changeFrom = previous?.close ?? last?.open ?? price;
-  const isUp = price >= changeFrom;
-  const priceColor = isUp ? '#089981' : '#F23645';
-  const changeText = price ? formatPct(changeFrom, price) : '—';
 
   return (
     <View style={styles.wrap}>
-      {/* Row one: symbol, live quote and actions. Kept separate from timeframes to avoid clipping on phones. */}
       <View style={styles.topRow}>
         <TouchableOpacity
           accessibilityRole="button"
@@ -57,28 +40,15 @@ export function TradingViewToolbar({ onOpenEditor, onReload, isMock }: Props) {
           <Ionicons name="chevron-down" size={13} color="#A7AAB3" />
         </TouchableOpacity>
 
-        {isMock && (
-          <View style={styles.demoBadge}>
-            <Text style={styles.demoText}>DEMO</Text>
-          </View>
-        )}
-
-        <View style={styles.quoteBlock}>
-          {loading && <ActivityIndicator size="small" color="#2962FF" style={styles.loader} />}
-          <View style={styles.quoteTextBlock}>
-            <Text numberOfLines={1} style={[styles.priceText, { color: priceColor }]}>
-              {price ? formatPrice(price, symbol) : '—'}
-            </Text>
-            <Text numberOfLines={1} style={[styles.changeText, { color: priceColor }]}>
-              {changeText}
-            </Text>
-          </View>
+        <View style={styles.dataSource}>
+          <View style={styles.sourceDot} />
+          <Text numberOfLines={1} style={styles.sourceText}>TRADINGVIEW DATA</Text>
         </View>
 
         <View style={styles.actions}>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Refresh chart data"
+            accessibilityLabel="Refresh chart"
             onPress={onReload}
             style={styles.actionButton}
           >
@@ -88,15 +58,14 @@ export function TradingViewToolbar({ onOpenEditor, onReload, isMock }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Open Pine script editor"
             onPress={onOpenEditor}
-            style={[styles.pineButton, compact && styles.pineButtonCompact]}
+            style={styles.pineButton}
           >
-            <Ionicons name="code-slash" size={15} color="#8EA8FF" />
-            {!compact && <Text style={styles.pineText}>Pine</Text>}
+            <Ionicons name="code-slash" size={15} color="#A9BBFF" />
+            <Text style={styles.pineText}>Pine</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* All eight timeframes are visible in a clean, swipeable tab strip. */}
       <View style={styles.timeframeRow}>
         <ScrollView
           style={styles.timeframeScroll}
@@ -123,7 +92,6 @@ export function TradingViewToolbar({ onOpenEditor, onReload, isMock }: Props) {
             );
           })}
         </ScrollView>
-        {loading && <ActivityIndicator size="small" color="#2962FF" style={styles.timeframeLoader} />}
       </View>
 
       <Modal
@@ -187,7 +155,7 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     paddingHorizontal: 10,
   },
-  topRow: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  topRow: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 7 },
   symbolButton: {
     maxWidth: 112,
     minHeight: 31,
@@ -200,20 +168,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   symbolText: { color: '#F0F1F4', fontWeight: '700', fontSize: 13 },
-  demoBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-    backgroundColor: 'rgba(255, 152, 0, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 152, 0, 0.45)',
-    borderRadius: 4,
-  },
-  demoText: { color: '#FFB74D', fontSize: 8, fontWeight: '800', letterSpacing: 0.3 },
-  quoteBlock: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-  loader: { marginRight: 1 },
-  quoteTextBlock: { minWidth: 0, alignItems: 'flex-end' },
-  priceText: { fontSize: 12, fontWeight: '700', fontFamily: 'monospace' },
-  changeText: { fontSize: 10, fontWeight: '600' },
+  dataSource: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  sourceDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#089981' },
+  sourceText: { color: '#9A9DA7', fontSize: 9, fontWeight: '700', letterSpacing: 0.45 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionButton: {
     width: 31,
@@ -236,7 +193,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(41, 98, 255, 0.28)',
     borderRadius: 5,
   },
-  pineButtonCompact: { minWidth: 34, width: 34, paddingHorizontal: 0 },
   pineText: { color: '#A9BBFF', fontSize: 11, fontWeight: '700' },
   timeframeRow: { height: 34, flexDirection: 'row', alignItems: 'center', marginTop: 5 },
   timeframeScroll: { flex: 1, minWidth: 0 },
@@ -254,7 +210,6 @@ const styles = StyleSheet.create({
   timeframeTabSelected: { backgroundColor: '#2962FF', borderColor: '#4D7CFF' },
   timeframeText: { color: '#A7AAB3', fontSize: 12, fontWeight: '600' },
   timeframeTextSelected: { color: '#FFFFFF', fontWeight: '700' },
-  timeframeLoader: { marginLeft: 4, marginRight: 2 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.72)', padding: 18 },
   modalCard: { width: '100%', maxWidth: 420, maxHeight: '72%', padding: 14, backgroundColor: '#1E222D', borderWidth: 1, borderColor: '#363B49', borderRadius: 9 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
